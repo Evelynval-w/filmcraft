@@ -1,7 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "apps/*", "xtask"]
-default-members = ["crates/*", "apps/*", "xtask"]
+members = [
+    "crates/*",
+    "apps/filmcraft",
+    "apps/filmcraft-cli",
+    "apps/filmcraft-web",
+    "apps/vidcraft/src-tauri",
+    "xtask",
+]
+default-members = [
+    "crates/*",
+    "apps/filmcraft",
+    "apps/filmcraft-cli",
+    "apps/filmcraft-web",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.8.0"

@@ -1,0 +1,30 @@
+[package]
+name = "vidcraft"
+description = "VidCraft — launcher-shaped AI video editor on top of the FilmCraft engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "vidcraft_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Subprocess management for shelling out to gflow-cli.
+tokio = { version = "1", features = ["process", "rt", "macros", "io-util"] }
+
+# FilmCraft engine — the whole reason this app lives in this workspace.
+filmcraft-engine = { workspace = true }

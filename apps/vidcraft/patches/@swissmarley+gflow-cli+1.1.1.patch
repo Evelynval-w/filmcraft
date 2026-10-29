@@ -1,0 +1,19 @@
+diff --git a/node_modules/@swissmarley/gflow-cli/dist/src/flow/locators.js b/node_modules/@swissmarley/gflow-cli/dist/src/flow/locators.js
+index 83428da..b67c90a 100644
+--- a/node_modules/@swissmarley/gflow-cli/dist/src/flow/locators.js
++++ b/node_modules/@swissmarley/gflow-cli/dist/src/flow/locators.js
+@@ -7,9 +7,11 @@ export function flowLocators(page) {
+         // for `doctor`; the prompt box only exists once a project is open.
+         dashboardMarker: page.getByRole("button", { name: /new project/i }),
+         newProjectButton: page.getByRole("button", { name: /new project/i }),
+-        // Submit button: "Create" carrying the arrow_forward icon (disabled until the prompt
+-        // has text). The sibling "add_2 Create" button is a different control.
+-        submitButton: page.locator("button", { hasText: "Create" }).filter({ hasText: /arrow_forward/ }),
++        // Submit button: the arrow_forward icon button (disabled until the prompt has text).
++        // Vidcraft fork: dropped the "Create" text requirement — Flow UI renamed the label
++        // (or localised it) past gflow-cli 1.1.1. Matches how scene.js and edit.js already
++        // locate the same submit by icon alone. .first() in page.js:249 disambiguates.
++        submitButton: page.locator("button").filter({ hasText: /arrow_forward/ }),
+         // The model/settings pill (e.g. "🍌 Nano Banana 2 / crop_16_9 / x2") opens the popover
+         // with Image/Video mode, aspect ratio, output count and model.
+         settingsButton: page.locator("button").filter({ hasText: /crop_(16_9|9_16|square|portrait|landscape)/ }),
