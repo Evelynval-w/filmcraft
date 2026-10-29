@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Film, Sparkles, Upload } from "lucide-react";
+import { Film, Sparkles, Upload, Trash2 } from "lucide-react";
 import { GenerateClipDialog } from "@/components/studio/GenerateClipDialog";
-import { addMediaItem } from "@/stores/projects";
+import { addMediaItem, deleteMediaItem } from "@/stores/projects";
 import type { MediaItem } from "@/types/project";
 
 type MediaLibraryProps = {
   projectId: string;
   mediaPool: MediaItem[];
   onClipAdded: (clip: MediaItem) => void;
+  onClipRemoved?: () => void;
 };
 
 function basename(path: string): string {
@@ -22,6 +23,7 @@ export function MediaLibrary({
   projectId,
   mediaPool,
   onClipAdded,
+  onClipRemoved,
 }: MediaLibraryProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -54,6 +56,11 @@ export function MediaLibrary({
     } catch (e) {
       setImportError(String(e));
     }
+  }
+
+  function handleDelete(itemId: string) {
+    deleteMediaItem(projectId, itemId);
+    onClipRemoved?.();
   }
 
   return (
@@ -106,7 +113,11 @@ export function MediaLibrary({
         {hasClips && (
           <div className="p-2 space-y-2">
             {mediaPool.map((item) => (
-              <ClipRow key={item.id} item={item} />
+              <ClipRow
+                key={item.id}
+                item={item}
+                onDelete={() => handleDelete(item.id)}
+              />
             ))}
           </div>
         )}
@@ -121,9 +132,42 @@ export function MediaLibrary({
   );
 }
 
-function ClipRow({ item }: { item: MediaItem }) {
+function ClipRow({
+  item,
+  onDelete,
+}: {
+  item: MediaItem;
+  onDelete: () => void;
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const confirmTimeout = useRef<number | null>(null);
+
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm) {
+      setConfirm(true);
+      if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+      confirmTimeout.current = window.setTimeout(() => setConfirm(false), 3000);
+      return;
+    }
+    if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+    onDelete();
+  }
+
   return (
-    <div className="rounded-md border border-border bg-muted/20 p-2 hover:border-primary/40 transition cursor-pointer">
+    <div className="group relative rounded-md border border-border bg-muted/20 p-2 hover:border-primary/40 transition">
+      <button
+        onClick={handleDeleteClick}
+        aria-label={confirm ? "Click again to delete" : "Delete clip"}
+        className={`absolute top-1.5 right-1.5 z-10 h-6 rounded-md border transition flex items-center gap-1 px-1.5 text-[10px] font-medium ${
+          confirm
+            ? "border-destructive bg-destructive text-destructive-foreground opacity-100"
+            : "border-border bg-background/90 backdrop-blur text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:border-destructive/40"
+        }`}
+      >
+        <Trash2 className="h-3 w-3" />
+        {confirm ? "again" : ""}
+      </button>
       <div className="aspect-video rounded bg-gradient-to-br from-slate-800 to-slate-900 border border-border mb-2 flex items-center justify-center">
         <Film className="h-5 w-5 text-muted-foreground" />
       </div>

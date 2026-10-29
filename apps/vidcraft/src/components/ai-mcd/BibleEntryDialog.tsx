@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
@@ -69,6 +69,8 @@ export function BibleEntryDialog({
 }: BibleEntryDialogProps) {
   const [draft, setDraft] = useState<BibleEntryDraft>(initial ?? emptyDraft());
   const [pickError, setPickError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirmTimeout = useRef<number | null>(null);
   const isEdit = Boolean(initial?.id);
   const kindLabel = kind === "character" ? "Character" : "Location";
   const imageLabel =
@@ -80,8 +82,25 @@ export function BibleEntryDialog({
     if (open) {
       setDraft(initial ?? emptyDraft());
       setPickError(null);
+      setConfirmDelete(false);
     }
   }, [open, initial]);
+
+  function handleDeleteClick() {
+    if (!onDelete) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+      confirmTimeout.current = window.setTimeout(
+        () => setConfirmDelete(false),
+        3000,
+      );
+      return;
+    }
+    if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+    onDelete();
+    onOpenChange(false);
+  }
 
   const issues = validateBibleEntry(draft);
   const errors = issues.filter((i) => i.severity === "error");
@@ -298,17 +317,18 @@ export function BibleEntryDialog({
         <DialogFooter className="gap-2 sm:gap-2">
           {isEdit && onDelete && (
             <Button
-              variant="ghost"
-              onClick={() => {
-                if (confirm(`Delete ${kindLabel.toLowerCase()}?`)) {
-                  onDelete();
-                  onOpenChange(false);
-                }
-              }}
-              className="mr-auto text-destructive hover:text-destructive"
+              variant={confirmDelete ? "destructive" : "outline"}
+              onClick={handleDeleteClick}
+              className={
+                confirmDelete
+                  ? "mr-auto"
+                  : "mr-auto border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
+              }
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              {confirmDelete
+                ? `Click again to delete ${kindLabel.toLowerCase()}`
+                : `Delete ${kindLabel.toLowerCase()}`}
             </Button>
           )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

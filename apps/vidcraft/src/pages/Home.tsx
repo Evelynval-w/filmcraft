@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,8 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Clapperboard } from "lucide-react";
-import { listProjects } from "@/stores/projects";
+import { Plus, Clapperboard, Trash2 } from "lucide-react";
+import { deleteProject, listProjects } from "@/stores/projects";
 import type { Project, InputMode } from "@/types/project";
 
 const MODE_LABEL: Record<InputMode, string> = {
@@ -28,8 +28,13 @@ type HomeProps = {
 };
 
 export function Home({ onOpenProject, onNewProject }: HomeProps) {
-  const [projects] = useState<Project[]>(() => listProjects());
+  const [projects, setProjects] = useState<Project[]>(() => listProjects());
   const hasProjects = projects.length > 0;
+
+  function handleDelete(id: string) {
+    deleteProject(id);
+    setProjects(listProjects());
+  }
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10">
@@ -55,6 +60,7 @@ export function Home({ onOpenProject, onNewProject }: HomeProps) {
               key={p.id}
               project={p}
               onOpen={() => onOpenProject(p.id)}
+              onDelete={() => handleDelete(p.id)}
             />
           ))}
         </div>
@@ -85,18 +91,47 @@ function EmptyState(props: { onNewProject: () => void }) {
 function ProjectCard({
   project,
   onOpen,
+  onDelete,
 }: {
   project: Project;
   onOpen: () => void;
+  onDelete: () => void;
 }) {
+  const [confirm, setConfirm] = useState(false);
+  const confirmTimeout = useRef<number | null>(null);
   const updated = new Date(project.updatedAt);
+
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm) {
+      setConfirm(true);
+      if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+      confirmTimeout.current = window.setTimeout(() => setConfirm(false), 3000);
+      return;
+    }
+    if (confirmTimeout.current) window.clearTimeout(confirmTimeout.current);
+    onDelete();
+  }
+
   return (
     <Card
-      className="cursor-pointer hover:border-primary/40 transition"
+      className="group relative cursor-pointer hover:border-primary/40 transition"
       onClick={onOpen}
     >
+      <button
+        onClick={handleDeleteClick}
+        aria-label={confirm ? "Click again to delete" : "Delete project"}
+        className={`absolute top-2 right-2 z-10 h-7 rounded-md border transition flex items-center gap-1 px-2 text-[11px] font-medium ${
+          confirm
+            ? "border-destructive bg-destructive text-destructive-foreground opacity-100"
+            : "border-border bg-background/80 backdrop-blur text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:border-destructive/40"
+        }`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        {confirm ? "Click again" : ""}
+      </button>
       <CardHeader>
-        <CardTitle className="truncate">{project.name}</CardTitle>
+        <CardTitle className="truncate pr-10">{project.name}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="aspect-video rounded-md bg-gradient-to-br from-slate-800 to-slate-900 border border-border" />

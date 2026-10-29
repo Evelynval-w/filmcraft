@@ -7,6 +7,10 @@ import type {
   Project,
   Scene,
 } from "@/types/project";
+import type {
+  MCDImportResult,
+  ParsedScene,
+} from "@/lib/ai-mcd/mcd-import";
 
 const STORAGE_KEY = "vidcraft.projects.v1";
 
@@ -104,6 +108,19 @@ export function addMediaItem(
   return updateProject(projectId, (p) => ({
     ...p,
     mediaPool: [...p.mediaPool, item],
+  }));
+}
+
+export function deleteMediaItem(
+  projectId: string,
+  itemId: string,
+): Project | undefined {
+  return updateProject(projectId, (p) => ({
+    ...p,
+    mediaPool: p.mediaPool.filter((m) => m.id !== itemId),
+    scenes: p.scenes.map((s) =>
+      s.videoMediaId === itemId ? { ...s, videoMediaId: undefined } : s,
+    ),
   }));
 }
 
@@ -273,4 +290,139 @@ export function reorderScene(
       scenes: swapped.map((s, k) => ({ ...s, index: k + 1 })),
     };
   });
+}
+
+// --- Bulk AI MCD import ---
+
+export type MCDImportReport = {
+  charactersAdded: number;
+  locationsAdded: number;
+  scenesAdded: number;
+  scenesSkipped: { title: string; reason: string }[];
+};
+
+/**
+ * Add every parsed character, location and scene from an AI MCD paste. Scene
+ * character/location tags are resolved against the bibles AFTER characters and
+ * locations have been added (so a scene can reference a character defined in
+ * the same paste). Entries with unresolved tags are reported, not silently
+ * dropped — nothing gets added for a scene whose location doesn't exist.
+ */
+export function importMCD(
+  projectId: string,
+  parsed: MCDImportResult,
+): MCDImportReport | undefined {
+  const report: MCDImportReport = {
+    charactersAdded: 0,
+    locationsAdded: 0,
+    scenesAdded: 0,
+    scenesSkipped: [],
+  };
+  const now = new Date().toISOString();
+
+  const updated = updateProject(projectId, (p) => {
+    const nextCharacters: CharacterEntry[] = [...p.bibles.characters];
+    for (const c of parsed.characters) {
+      if (nextCharacters.some((x) => x.tagName === c.tagName)) continue;
+      nextCharacters.push({
+        id: crypto.randomUUID(),
+        tagName: c.tagName,
+        verbatimSummary: c.verbatimSummary,
+        negativeList: c.negativeList,
+        approved: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      report.charactersAdded++;
+    }
+
+    const nextLocations: LocationEntry[] = [...p.bibles.locations];
+    for (const l of parsed.locations) {
+      if (nextLocations.some((x) => x.tagName === l.tagName)) continue;
+      nextLocations.push({
+        id: crypto.randomUUID(),
+        tagName: l.tagName,
+        verbatimSummary: l.verbatimSummary,
+        negativeList: l.negativeList,
+        approved: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      report.locationsAdded++;
+    }
+
+    const charsByTag = new Map(nextCharacters.map((c) => [c.tagName, c.id]));
+    const locsByTag = new Map(nextLocations.map((l) => [l.tagName, l.id]));
+
+    const nextScenes: Scene[] = [...p.scenes];
+    let nextIndex =
+      nextScenes.reduce((max, s) => Math.max(max, s.index), 0) + 1;
+
+    for (const s of parsed.scenes) {
+      const resolved = resolveSceneTags(s, charsByTag, locsByTag);
+      if (resolved.error) {
+        report.scenesSkipped.push({
+          title: s.title ?? "(no title)",
+          reason: resolved.error,
+        });
+        continue;
+      }
+      nextScenes.push({
+        id: crypto.randomUUID(),
+        index: nextIndex++,
+        title: s.title,
+        beat: s.beat,
+        characterIds: resolved.characterIds,
+        locationId: resolved.locationId,
+        shotDescription: s.shotDescription,
+        negativeAdditions: s.negativeAdditions,
+        createdAt: now,
+        updatedAt: now,
+      });
+      report.scenesAdded++;
+    }
+
+    return {
+      ...p,
+      bibles: { characters: nextCharacters, locations: nextLocations },
+      scenes: nextScenes,
+    };
+  });
+
+  return updated ? report : undefined;
+}
+
+function resolveSceneTags(
+  scene: ParsedScene,
+  charsByTag: Map<string, string>,
+  locsByTag: Map<string, string>,
+): {
+  characterIds: string[];
+  locationId: string | undefined;
+  error?: string;
+} {
+  const characterIds: string[] = [];
+  for (const tag of scene.characterTags) {
+    const id = charsByTag.get(tag);
+    if (!id) {
+      return {
+        characterIds: [],
+        locationId: undefined,
+        error: `unknown character tag "${tag}"`,
+      };
+    }
+    characterIds.push(id);
+  }
+  let locationId: string | undefined;
+  if (scene.locationTag) {
+    locationId = locsByTag.get(scene.locationTag);
+    if (!locationId) {
+      return {
+        characterIds: [],
+        locationId: undefined,
+        error: `unknown location tag "${scene.locationTag}"`,
+      };
+    }
+  }
+  return { characterIds, locationId };
 }
