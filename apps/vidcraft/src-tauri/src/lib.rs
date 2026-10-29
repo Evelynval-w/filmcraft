@@ -6,6 +6,7 @@
 //! the future `vidcraft-flow-bridge`, `vidcraft-rush-agent`, `vidcraft-mcd-bridge`
 //! crates — not here.
 
+mod export;
 mod flow;
 
 use serde::Serialize;
@@ -39,6 +40,8 @@ pub fn run() {
             flow::gflow_status,
             flow::gflow_auth_login,
             flow::gflow_generate_video,
+            export::ffmpeg_probe,
+            export::export_sequence,
         ])
         .run(tauri::generate_context!());
 

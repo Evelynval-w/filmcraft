@@ -105,6 +105,16 @@ export type Scene = {
   sceneImagePath?: string;
   /** MediaItem id in mediaPool for the final video (from Flow image-to-video). */
   videoMediaId?: string;
+  /**
+   * Trim: start the attached clip at this second instead of 0. Undefined = play
+   * from the beginning. Only applies at export time.
+   */
+  trimInSeconds?: number;
+  /**
+   * Trim: stop playback at this second (in source time). Undefined = play to
+   * the end of the clip. Only applies at export time.
+   */
+  trimOutSeconds?: number;
   createdAt: string;
   updatedAt: string;
 };
